@@ -22,8 +22,8 @@
 #define AIO_SERVER "io.adafruit.com"
 #define AIO_SERVERPORT 1883
 
-#define IO_USERNAME "smarthome_doan"
-#define IO_KEY "aio_KvhG23VXUzzdFzFeXTchD0EX6fqH"
+#define IO_USERNAME "***"
+#define IO_KEY "***"
 
 // Từ khóa cấu hình cảm biến DHT
 #define DHTTYPE DHT11
