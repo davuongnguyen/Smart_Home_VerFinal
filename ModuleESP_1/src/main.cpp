@@ -23,7 +23,7 @@
 #define AIO_SERVERPORT 1883
 
 #define IO_USERNAME "smarthome_doan"
-#define IO_KEY "aio_RhZL07rLovLNuXJL5m1FNe1OOgi1"
+#define IO_KEY "aio_KvhG23VXUzzdFzFeXTchD0EX6fqH"
 
 // Từ khóa cấu hình cảm biến DHT
 #define DHTTYPE DHT11
@@ -32,14 +32,12 @@
 #define DHTPIN 0
 #define LIGHT_PIN 4
 #define LIGHT_BEDROOM 5
-#define FAN_PIN 12
 #define TV_PIN 13
 
 // Định nghĩa các chân nút bấm
 #define BUTTON_LIGHT 14
 #define BUTTON_BEDROOM 16
-#define BUTTON_FAN 2
-// #define BUTTON_TV           15
+#define BUTTON_TV 12
 
 #pragma endregion
 
@@ -52,9 +50,7 @@ Adafruit_MQTT_Client mqtt(&client, AIO_SERVER, AIO_SERVERPORT, IO_USERNAME, IO_K
 // Khởi tạo liên kết tới nguồn cấp dữ liệu
 Adafruit_MQTT_Subscribe light = Adafruit_MQTT_Subscribe(&mqtt, IO_USERNAME "/feeds/light");
 Adafruit_MQTT_Subscribe lighBedroom = Adafruit_MQTT_Subscribe(&mqtt, IO_USERNAME "/feeds/light-bedroom");
-Adafruit_MQTT_Subscribe fan = Adafruit_MQTT_Subscribe(&mqtt, IO_USERNAME "/feeds/fan");
 Adafruit_MQTT_Subscribe tv = Adafruit_MQTT_Subscribe(&mqtt, IO_USERNAME "/feeds/tv");
-Adafruit_MQTT_Subscribe fanAuto = Adafruit_MQTT_Subscribe(&mqtt, IO_USERNAME "/feeds/fan-auto");
 
 Adafruit_MQTT_Publish Temperature1 = Adafruit_MQTT_Publish(&mqtt, IO_USERNAME "/feeds/temperature");
 Adafruit_MQTT_Publish Humidity1 = Adafruit_MQTT_Publish(&mqtt, IO_USERNAME "/feeds/humidity");
@@ -62,8 +58,7 @@ Adafruit_MQTT_Publish HeatIndex = Adafruit_MQTT_Publish(&mqtt, IO_USERNAME "/fee
 
 Adafruit_MQTT_Publish light_Publish = Adafruit_MQTT_Publish(&mqtt, IO_USERNAME "/feeds/light");
 Adafruit_MQTT_Publish lighBedroom_Publish = Adafruit_MQTT_Publish(&mqtt, IO_USERNAME "/feeds/light-bedroom");
-Adafruit_MQTT_Publish fan_Publish = Adafruit_MQTT_Publish(&mqtt, IO_USERNAME "/feeds/fan");
-// Adafruit_MQTT_Publish tv_Publish = Adafruit_MQTT_Publish(&mqtt, IO_USERNAME "/feeds/tv");
+Adafruit_MQTT_Publish tv_Publish = Adafruit_MQTT_Publish(&mqtt, IO_USERNAME "/feeds/tv");
 
 Adafruit_MQTT_Subscribe *subscription;
 
@@ -79,20 +74,22 @@ unsigned long time_Reconnect = 0, time_sensor = 0, time_button = 0;
 // Khởi tạo biến lưu trữ nhiệt độ, độ ẩm, chỉ số nóng bức.
 float hum = 0, temp = 0, hic = 0;
 
-const byte INPUT_PIN[] = {BUTTON_LIGHT, BUTTON_BEDROOM, BUTTON_FAN}; // BUTTON_TV, (trước button fan)
+// Lần lượt: nút nhấn đèn, nút nhấn đèn ngủ, nút nhấn ti vi
+const byte INPUT_PIN[] = {BUTTON_LIGHT, BUTTON_BEDROOM, BUTTON_TV};
+
+// Lần lượt: đầu ra đèn, đầu ra đèn ngủ, đầu ra ti vi
 const byte OUTPUT_PIN[] = {LIGHT_PIN, LIGHT_BEDROOM, TV_PIN};
 
-// Có sự thay đổi nút nhấn: đèn, đèn ngủ, ti vi tốc độ quạt
-byte change_button[] = {0, 0, 0, 0};
+// Có sự thay đổi nút nhấn: đèn, đèn ngủ, ti vi
+byte change_button[] = {0, 0, 0};
 
 // Lưu trạng thái đầu ra: đèn, đèn ngủ, ti vi
-byte state[] = {0, 0, 0};
+// Ban đầu: state[] = {1, 1, 1};
+// 1 - tắt
+// 0 - bật
+byte state[] = {1, 1, 1};
 
-int speed = 0; //Lưu tốc độ quạt
-byte fanMode = 0;
-int speed_auto = 0;
-
-// Trạng thái online / offline
+// Trạng thái online = 1, offline = 0
 byte mode = 0;
 
 // Biến lưu trạng thái đã tải lên thành công
@@ -102,31 +99,44 @@ byte val = 0;
 
 #pragma region Nguyên mẫu các hàm
 
+// Kiểm tra trạng thái kết nối Wifi
+// In ra tên Wifi và địa chỉ IP cục bộ
+// Mỗi 10s tối đa kiểm tra 1 lần
 void wifi_connect();
 
+// Kiểm tra kết nối tới MQTT
 void mqtt_connect();
 
+// Đọc dữ liệu từ cảm biến DHT 11 mỗi 20s một lần, sau đó gửi dữ liệu lên server nếu có kết nối với MQTT
 void read_sensor();
 
+// Đọc dữ liệu từ nút bấm và thực thi lệnh từ nút bấm, sau đó chuyển trạng thái nút bấm thành có thay đổi
 void read_button();
-void readBUTTON_LIGHT();
-void readBUTTON_BEDROOM();
-void readBUTTON_FAN();
 
+// Gửi dữ liệu từ nút bấm lên server nếu có thay đổi từ nút bấm
 void send_button();
+
+// Gửi dữ liệu nhiệt độ lên MQTT
 void send_temperature();
+
+// Gửi dữ liệu độ ẩm lên MQTT
 void send_humidity();
+
+// Gửi dữ liệu về chỉ số nóng bức lên MQTT
 void send_heat_index();
 
+// Nhận trạng thái của đèn chiếu sáng từ MQTT
 void receive_light();
+
+// Nhận trạng thái của đèn ngủ từ MQTT
 void receive_light_bedroom();
-void receive_fan_speed();
+
+// Nhận trạng thái của ti vi từ MQTT
 void receive_tv();
-void receive_fan_auto();
 
+// Ping tới server để giữ kết nối tồn tại
+// Không bắt buộc nếu gửi dữ liệu lên server mỗi giây
 void mqtt_ping();
-
-void fan_auto(byte a);
 
 #pragma endregion
 
@@ -146,20 +156,15 @@ void setup()
   for (byte k = 0; k < 3; k++)
   {
     pinMode(OUTPUT_PIN[k], OUTPUT);
-    digitalWrite(OUTPUT_PIN[k], HIGH);
+    digitalWrite(OUTPUT_PIN[k], state[k]);
   }
-  analogWrite(FAN_PIN, 0);
-
   // Bắt đầu thuật toán giải mã dữ liệu từ cảm biến dth
   dht.begin();
 
   // Thiết lập đăng ký nguồn cấp dữ liệu trên MQTT theo thời gian
   mqtt.subscribe(&light);
   mqtt.subscribe(&lighBedroom);
-  mqtt.subscribe(&fan);
   mqtt.subscribe(&tv);
-  mqtt.subscribe(&fanAuto);
-
 }
 
 void loop()
@@ -183,16 +188,12 @@ void loop()
       {
         receive_light();
         receive_light_bedroom();
-        receive_fan_speed();
         receive_tv();
-        receive_fan_auto();
       }
     }
 
     mqtt_ping();
   }
-
-  fan_auto(fanMode);
 }
 
 void wifi_connect()
@@ -277,99 +278,70 @@ void read_sensor()
 
 void read_button()
 {
-  for (int i = 0; i < 2; i++)
+  for (int i = 0; i < 3; i++)
   {
     if (digitalRead(INPUT_PIN[i]) == LOW)
     {
       Serial.println("Đã nhấn ...");
-      digitalWrite(OUTPUT_PIN[i], state[i]);
       state[i] = !state[i];
+      digitalWrite(OUTPUT_PIN[i], state[i]);
       change_button[i] = 1;
       delay(500);
     }
-  }
-  if (digitalRead(BUTTON_FAN) == LOW)
-  {
-    change_button[2] = 1;
-    if (speed >= 255)
-      speed = 0;
-    else
-      speed += 51;
-    analogWrite(FAN_PIN, speed);
-    Serial.print("Tốc độ quạt: ");
-    Serial.println(speed);
-    delay(500);
   }
 }
 
 void send_button()
 {
-  if ((unsigned long)(millis() - time_button) > 100)
+  for (byte i = 0; i < 3; i++)
   {
-    time_button = millis();
-    for (byte i = 0; i < 3; i++)
+    if (change_button[i] == 1)
     {
-      if (change_button[i] == 1)
+      switch (i)
       {
-        switch (i)
+      case 0:
+        if (!light_Publish.publish(state[i]))
         {
-        case 0:
-          if (!light_Publish.publish(state[i]))
-          {
-            Serial.println(F("Tải lên nút bấm đèn chiếu sáng thất bại!"));
-          }
-          else
-          {
-            Serial.println(F("Tải lên nút bấm đèn chiếu sáng thành công!"));
-            change_button[i] = 0;
-          }
-          break;
-
-        case 1:
-          if (!lighBedroom_Publish.publish(state[i]))
-          {
-            Serial.println(F("Tải lên nút bấm đèn ngủ thất bại!"));
-          }
-          else
-          {
-            Serial.println(F("Tải lên nút bấm đèn ngủ thành công!"));
-            change_button[i] = 0;
-          }
-          break;
-
-          // case 2:
-          //   if (!tv_Publish.publish(state[i]))
-          //   {
-          //     Serial.println(F("Failed to upload button tv!"));
-          //     val++;
-          //   }
-          //   else
-          //   {
-          //     Serial.println(F("tv uploaded successfully!"));
-          //     change_button[i] = 0;
-          //   }
-          //   break;
-
-        default:
-          break;
+          Serial.println(F("Tải lên nút bấm đèn chiếu sáng thất bại!"));
         }
-
-        if (i == 2)
+        else
         {
-          if (!fan_Publish.publish(speed))
-          {
-            Serial.println(F("Tải lên tốc độ quạt thất bại!"));
-          }
-          else
-          {
-            Serial.println(F("Tải lên tốc độ quạt thành công!"));
-            change_button[i] = 0;
-          }
+          Serial.println(F("Tải lên nút bấm đèn chiếu sáng thành công!"));
+          change_button[i] = 0;
         }
+        break;
+
+      case 1:
+        if (!lighBedroom_Publish.publish(state[i]))
+        {
+          Serial.println(F("Tải lên nút bấm đèn ngủ thất bại!"));
+        }
+        else
+        {
+          Serial.println(F("Tải lên nút bấm đèn ngủ thành công!"));
+          change_button[i] = 0;
+        }
+        break;
+
+      case 2:
+        if (!tv_Publish.publish(state[i]))
+        {
+          Serial.println(F("Failed to upload button tv!"));
+          val++;
+        }
+        else
+        {
+          Serial.println(F("tv uploaded successfully!"));
+          change_button[i] = 0;
+        }
+        break;
+
+      default:
+        break;
       }
     }
   }
-  val = change_button[0] + change_button[1] + change_button[2] + change_button[3];
+  val = change_button[0] + change_button[1] + change_button[2];
 }
 
 void send_temperature()
@@ -404,13 +376,15 @@ void receive_light()
   {
     Serial.print("Đèn chiếu sáng: ");
 
-    if (strcmp((char *)light.lastread, "1") == 0)
+    if (strcmp((char *)light.lastread, "0") == 0)
     {
+      state[0] = 0;
       digitalWrite(LIGHT_PIN, LOW);
       Serial.println(" Bật.");
     }
     else
     {
+      state[0] = 1;
       digitalWrite(LIGHT_PIN, HIGH);
       Serial.println("Tắt.");
     }
@@ -424,46 +398,17 @@ void receive_light_bedroom()
   {
     Serial.print(F("Đèn ngủ: "));
 
-    if (strcmp((char *)lighBedroom.lastread, "1") == 0)
+    if (strcmp((char *)lighBedroom.lastread, "0") == 0)
     {
+      state[1] = 0;
       digitalWrite(LIGHT_BEDROOM, LOW);
       Serial.println(" Bật.");
     }
     else
     {
+      state[1] = 1;
       digitalWrite(LIGHT_BEDROOM, HIGH);
       Serial.println("Tắt.");
-    }
-  }
-}
-
-void receive_fan_speed()
-{
-  // Kiểm tra nếu là feed của quạt
-  if (subscription == &fan)
-  {
-    Serial.print(F("Tốc độ quạt: "));
-    Serial.println((char *)fan.lastread);
-    uint16_t sliderval = atoi((char *)fan.lastread); // chuyển thành 1 số
-    analogWrite(FAN_PIN, sliderval);
-    speed = (int) sliderval;
-  }
-}
-
-void receive_fan_auto()
-{
-  // Kiểm tra nếu là feed của tự động quạt
-  if (subscription == &fanAuto)
-  {
-    if (strcmp((char *)fanAuto.lastread, "1") == 0)
-    {
-      Serial.println("Quạt tự động : Bật.");
-      fanMode = 1;
-    }
-    else
-    {
-      Serial.println("Quạt tự động : Tắt.");
-      fanMode = 0;
     }
   }
 }
@@ -475,13 +420,15 @@ void receive_tv()
   {
     Serial.print(F("Trạng thái ti vi: "));
 
-    if (strcmp((char *)tv.lastread, "1") == 0)
+    if (strcmp((char *)tv.lastread, "0") == 0)
     {
+      state[2] = 0;
       digitalWrite(TV_PIN, LOW);
       Serial.println(" Bật.");
     }
     else
     {
+      state[2] = 1;
       digitalWrite(TV_PIN, HIGH);
       Serial.println("Tắt.");
     }
@@ -490,43 +437,11 @@ void receive_tv()
 
 void mqtt_ping()
 {
-
   // ping máy chủ để giữ cho kết nối mqtt hoạt động
   if (!mqtt.ping())
   {
     Serial.println("MQTT không phản hồi ...");
     mqtt.disconnect();
-  }
-}
-
-void fan_auto(byte a)
-{
-  if (a == 1)
-  {
-    // Chọn tốc độ theo chỉ số nóng bức
-    if (hic > 22 && hic < 27)
-    {
-      speed_auto = 51;
-    }
-    else if (hic >= 27 && hic < 30)
-    {
-      speed_auto = 153;
-    }
-    else if (hic >= 32 && hic < 35)
-    {
-      speed_auto = 204;
-    }
-    else if (hic >= 35)
-    {
-      speed_auto = 255;
-    }
-
-    // Nếu tốc độ thay đổi thì tải lên tốc độ mới
-    if (speed_auto != speed)
-    {
-      change_button[2] = 1;
-      speed = speed_auto;
-      analogWrite(FAN_PIN, speed);
-    }
+    mode = 0;
   }
 }
