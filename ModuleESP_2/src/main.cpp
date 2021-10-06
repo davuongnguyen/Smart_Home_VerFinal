@@ -18,8 +18,8 @@
 #define AIO_SERVER "io.adafruit.com"
 #define AIO_SERVERPORT 1883
 
-#define IO_USERNAME "smarthome_doan"
-#define IO_KEY "aio_KvhG23VXUzzdFzFeXTchD0EX6fqH"
+#define IO_USERNAME "***"
+#define IO_KEY "***"
 
 // Định nghĩa chân các thiết bị
 #define PW_PIN 4          //Led này tích cực mức cao
@@ -315,11 +315,13 @@ void receive_fan_auto()
     {
       Serial.println("Quạt tự động : Bật.");
       fanMode = 0;
+      digitalWrite(FAN_AUTO, fanMode);
     }
     else
     {
       Serial.println("Quạt tự động : Tắt.");
       fanMode = 1;
+      digitalWrite(FAN_AUTO, fanMode);
     }
   }
 }
