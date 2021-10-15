@@ -9,7 +9,7 @@ Mô tả:
 Phần cứng:
 	- ESP8266 NodeMCU
 	- cảm biến DHT 11 
-	- Led, điện trở, nút bấm ...
+	- Led, điện trở, nút bấm, L298N
 
 Phần mềm:
 	Mã nguồn viết bằng Visual Studio Code kết hợp với tiện ích PlatformIO, biên dịch trên Framework Arduino.
@@ -27,7 +27,7 @@ Phần mềm:
 	
 Lưu ý: 
 	- Nối led ở vị trí tích cực mức thấp.
-	- Về google assistants, có thể cài đặt trực tiếp trên hệ điều hành Windows: https://github.com/Melvin-Abraham/Google-Assistant-Unofficial-Desktop-Client
+	- Về google assistants, có thể cài đặt trực tiếp trên hệ điều hành Windows hoặc MacOS: https://github.com/Melvin-Abraham/Google-Assistant-Unofficial-Desktop-Client
 
 Các lỗi còn tồn đọng:
 	....
