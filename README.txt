@@ -14,6 +14,7 @@ Phần cứng:
 Phần mềm:
 	Mã nguồn viết bằng Visual Studio Code kết hợp với tiện ích PlatformIO, biên dịch trên Framework Arduino.
 	Link download:
+		https://git-scm.com/downloads
 		https://code.visualstudio.com/download
 		https://marketplace.visualstudio.com/items?itemName=platformio.platformio-ide&ssr=false#review-details
 		https://www.arduino.cc/en/software
